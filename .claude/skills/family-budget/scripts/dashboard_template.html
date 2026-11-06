@@ -37,8 +37,15 @@ select { font: inherit; color: var(--ink); background: var(--surface); border: 1
 .tile .delta { font-size: 13px; color: var(--ink-2); margin-top: 2px; display: flex; gap: 6px; align-items: center; }
 .status { display: inline-flex; align-items: center; gap: 4px; }
 .status svg { flex: none; }
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
-.card h2 { font-size: 16px; font-weight: 600; margin: 0 0 8px; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 760px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; min-width: 0; }
+.card h2 { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
+.card .tiles { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.card .tile { padding: 8px 10px; border-radius: 8px; }
+.card .tile .label { font-size: 12px; }
+.card .tile .value { font-size: 17px; }
+.card .tile .delta { font-size: 12px; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 8px; padding: 0; list-style: none;
   color: var(--ink-2); font-size: 13px; }
 .legend li { display: inline-flex; align-items: center; gap: 6px; }
@@ -74,9 +81,12 @@ th { color: var(--ink-2); font-weight: 600; }
   <div class="filters"><label for="month" id="month-label"></label><select id="month"></select></div>
   <section class="tiles" id="kpis" aria-live="polite"></section>
 
-  <section class="card" id="cashflow"></section>
-  <section class="card" id="categories"></section>
-  <section class="card" id="widget"></section>
+  <div class="grid">
+    <section class="card" id="cashflow"></section>
+    <section class="card" id="categories"></section>
+    <section class="card" id="recurring"></section>
+    <section class="card" id="gap"></section>
+  </div>
 </main>
 <div class="tooltip" id="tooltip" hidden></div>
 <script type="application/json" id="data">/*__DATA__*/{}</script>
@@ -182,7 +192,7 @@ function barPath(x, w, yBase, yEnd) {
    opts: { bars: [{name, color, values}], stacked, line: {name, color, values}, colorOf(value, seriesIndex) } */
 function columnChart(container, months, opts) {
   container.replaceChildren();
-  const width = Math.max(320, container.clientWidth), height = 260;
+  const width = Math.max(280, container.clientWidth), height = opts.height || 200;
   const m = { top: 12, right: 12, bottom: 28, left: 64 };
   const iw = width - m.left - m.right, ih = height - m.top - m.bottom;
   const n = months.length, band = iw / Math.max(n, 1);
@@ -208,7 +218,7 @@ function columnChart(container, months, opts) {
   }
   months.forEach((month, i) => {
     const cx = m.left + band * i + band / 2;
-    svg.append(el("svg:text", { x: cx, y: height - 8, "text-anchor": "middle" }, monthShort(month)));
+    svg.append(el("svg:text", { x: cx, y: height - 8, "text-anchor": "middle" }, (opts.labelOf || monthShort)(month)));
     if (opts.stacked) {
       const w = Math.min(24, band * 0.5);
       let pos = 0;
@@ -232,21 +242,26 @@ function columnChart(container, months, opts) {
       });
     }
   });
-  if (opts.line) {
-    const pts = months.map((_, i) => [m.left + band * i + band / 2, y(opts.line.values[i] || 0)]);
-    if (pts.length > 1) {
-      svg.append(el("svg:polyline", { points: pts.map(p => p.join(",")).join(" "), fill: "none",
+  if (opts.line) {  // the line breaks where a month has no data
+    const pts = months.map((_, i) => opts.line.values[i] == null ? null : [m.left + band * i + band / 2, y(opts.line.values[i])]);
+    let run = [];
+    const flush = () => {
+      if (run.length > 1) svg.append(el("svg:polyline", { points: run.map(p => p.join(",")).join(" "), fill: "none",
         stroke: opts.line.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
-    }
-    pts.forEach(([px, py]) => svg.append(el("svg:circle", { cx: px, cy: py, r: 4.5, fill: opts.line.color,
-      stroke: css("--surface"), "stroke-width": 2 })));
+      run = [];
+    };
+    pts.forEach(p => (p ? run.push(p) : flush()));
+    flush();
+    pts.filter(Boolean).forEach(([px, py]) => svg.append(el("svg:circle", { cx: px, cy: py, r: 4.5,
+      fill: opts.line.color, stroke: css("--surface"), "stroke-width": 2 })));
   }
   months.forEach((month, i) => {  // one hit band per month: every series in one tooltip
     const hit = el("svg:rect", { class: "hit", x: m.left + band * i, y: m.top, width: band, height: ih, tabindex: 0,
       "aria-label": monthName(month) });
     const rows = () => opts.rows(i);
-    hit.addEventListener("pointermove", e => showTip(e, monthName(month), rows()));
-    hit.addEventListener("focus", e => showTip({ target: hit }, monthName(month), rows()));
+    const show = e => { const r = rows(); if (r.length) showTip(e, monthName(month), r); else hideTip(); };
+    hit.addEventListener("pointermove", show);
+    hit.addEventListener("focus", () => show({ target: hit }));
     hit.addEventListener("pointerleave", hideTip);
     hit.addEventListener("blur", hideTip);
     svg.append(hit);
@@ -254,22 +269,28 @@ function columnChart(container, months, opts) {
   container.append(svg);
 }
 
-/* ---------- page ---------- */
-const months = D.months.map(m => m.month);
+/* ---------- page: everything is scoped by the selected year ---------- */
 const byMonth = Object.fromEntries(D.months.map(m => [m.month, m]));
+const years = [...new Set(D.months.map(m => m.month.slice(0, 4)))].sort().reverse();
 const palette = ["--s1", "--s2", "--s3", "--s4", "--s5", "--s6", "--s7"];
 const catColor = (name, i) => (name === L.dash_other ? css("--other") : css(palette[i % palette.length]));
+const monthLabel = m => MONTHS[+m.slice(5) - 1].slice(0, 3);
 
 document.title = L.dash_title;
 document.getElementById("title").textContent = L.dash_title;
 document.getElementById("subtitle").textContent = L.dash_subtitle;
-document.getElementById("month-label").textContent = L.dash_month;
+document.getElementById("month-label").textContent = L.dash_year_label;
 const select = document.getElementById("month");
-months.slice().reverse().forEach(m => select.append(el("option", { value: m }, monthName(m))));
+years.forEach(y => select.append(el("option", { value: y }, y)));
 
-function tile(label, value, extra) {
+const yearMonths = () => Array.from({ length: 12 }, (_, i) => `${select.value}-${String(i + 1).padStart(2, "0")}`);
+const value = (m, key) => (byMonth[m] ? byMonth[m][key] : null);
+const presentMonths = () => yearMonths().filter(m => byMonth[m]);
+const total = key => presentMonths().reduce((acc, m) => acc + (byMonth[m][key] || 0), 0);
+
+function tile(label, text, extra) {
   const t = el("div", { class: "tile" });
-  t.append(el("div", { class: "label" }, label), el("div", { class: "value" }, value));
+  t.append(el("div", { class: "label" }, label), el("div", { class: "value" }, text));
   if (extra) t.append(extra);
   return t;
 }
@@ -280,106 +301,110 @@ function statusBadge(over, text) {
   wrap.append(icon, document.createTextNode(text));
   return wrap;
 }
+function chartIn(card) {
+  const chart = el("div", { class: "chart" });
+  card.append(chart);
+  return chart;
+}
 
 function renderKpis() {
-  const m = byMonth[select.value];
-  const box = document.getElementById("kpis");
-  box.replaceChildren(
-    tile(L.dash_income, fmt(m.income)),
-    tile(L.dash_expenses, fmt(m.expenses)),
-    tile(L.dash_balance, signed(m.balance)),
+  document.getElementById("kpis").replaceChildren(
+    tile(L.dash_year_income, fmt(total("income"))),
+    tile(L.dash_year_expenses, fmt(total("expenses"))),
+    tile(L.dash_year_balance, signed(total("balance"))),
+    tile(L.dash_months_with_data, String(presentMonths().length)),
   );
-  renderWidgetTiles();
 }
 
 function renderCashflow() {
+  const ms = yearMonths();
   const card = document.getElementById("cashflow");
   card.replaceChildren(el("h2", {}, L.dash_cashflow));
   const s = [
-    { name: L.dash_income, color: css("--s1"), values: D.months.map(m => m.income) },
-    { name: L.dash_expenses, color: css("--s2"), values: D.months.map(m => m.expenses) },
+    { name: L.dash_income, color: css("--s1"), values: ms.map(m => value(m, "income")) },
+    { name: L.dash_expenses, color: css("--s2"), values: ms.map(m => value(m, "expenses")) },
   ];
-  const line = { name: L.dash_balance, color: css("--s3"), values: D.months.map(m => m.balance) };
+  const line = { name: L.dash_balance, color: css("--s3"), values: ms.map(m => value(m, "balance")) };
   card.append(legend([...s, { ...line, line: true }]));
-  const chart = el("div", { class: "chart" });
-  card.append(chart);
-  columnChart(chart, months, { title: L.dash_cashflow, bars: s, line,
+  columnChart(chartIn(card), ms, { title: L.dash_cashflow, bars: s, line, labelOf: monthLabel,
     rows: i => [...s, line].map(x => ({ name: x.name, color: x.color, value: x === line ? signed(x.values[i]) : fmt(x.values[i]) })) });
   card.append(tableView([L.dash_month, L.dash_income, L.dash_expenses, L.dash_balance],
-    D.months.map(m => [monthName(m.month), fmt(m.income), fmt(m.expenses), signed(m.balance)])));
+    [...ms.map(m => [monthName(m), fmt(value(m, "income")), fmt(value(m, "expenses")), signed(value(m, "balance"))]),
+     [L.dash_total, fmt(total("income")), fmt(total("expenses")), signed(total("balance"))]]));
 }
 
 function renderCategories() {
+  const ms = yearMonths();
   const card = document.getElementById("categories");
   card.replaceChildren(el("h2", {}, L.dash_categories));
-  const s = D.categories.map((c, i) => ({ name: c, color: catColor(c, i), values: D.months.map(m => m.by_category[c] || 0) }));
+  const s = D.categories.map((c, i) => ({ name: c, color: catColor(c, i),
+    values: ms.map(m => (byMonth[m] ? byMonth[m].by_category[c] || 0 : null)) }));
   card.append(legend(s));
-  const chart = el("div", { class: "chart" });
-  card.append(chart);
-  columnChart(chart, months, { title: L.dash_categories, bars: s, stacked: true,
-    rows: i => s.filter(x => x.values[i] > 0).slice().reverse()
-      .map(x => ({ name: x.name, color: x.color, value: fmt(x.values[i]) })) });
+  columnChart(chartIn(card), ms, { title: L.dash_categories, bars: s, stacked: true, labelOf: monthLabel,
+    rows: i => (byMonth[ms[i]] ? s.filter(x => x.values[i] > 0).slice().reverse()
+      .map(x => ({ name: x.name, color: x.color, value: fmt(x.values[i]) })) : []) });
   if (D.folded.length) card.append(el("p", { class: "note" }, L.dash_folded.replace("{names}", D.folded.join(", "))));
   // the table lists every category, also those folded into "Other" in the chart
-  card.append(tableView([L.dash_category, ...D.months.map(m => monthName(m.month))],
-    [...D.all_categories.map(c => [c, ...D.months.map(m => fmt(m.all_by_category[c] || 0))]),
-     [L.dash_total, ...D.months.map(m => fmt(m.expenses))]]));
+  const present = presentMonths();
+  const sumCat = c => present.reduce((acc, m) => acc + (byMonth[m].all_by_category[c] || 0), 0);
+  card.append(tableView([L.dash_category, ...present.map(monthLabel), L.dash_total],
+    [...D.all_categories.map(c => [c, ...present.map(m => fmt(byMonth[m].all_by_category[c] || 0)), fmt(sumCat(c))]),
+     [L.dash_total, ...present.map(m => fmt(byMonth[m].expenses)), fmt(total("expenses"))]]));
 }
 
-function renderWidgetTiles() {
-  const box = document.getElementById("widget-tiles");
-  if (!box) return;
-  const m = byMonth[select.value];
-  const tiles = [tile(L.dash_recurring, fmt(m.recurring)), tile(L.dash_one_off, fmt(m.one_off))];
-  if (m.loans) tiles.push(tile(L.dash_loans, fmt(m.loans)));
-  if (m.gap != null) {
-    const over = m.gap > 0;
-    const delta = el("div", { class: "delta" });
-    delta.append(statusBadge(over, `${pct.format(m.gap / m.benchmark)} ${over ? L.dash_over : L.dash_under}`));
-    tiles.push(tile(L.dash_benchmark, fmt(m.benchmark)), tile(L.dash_gap, signed(m.gap), delta));
-  }
-  box.replaceChildren(...tiles);
-}
-
-function renderWidget() {
-  const card = document.getElementById("widget");
-  card.replaceChildren(el("h2", {}, L.dash_widget));
-  const tiles = el("div", { class: "tiles", id: "widget-tiles" });
+function renderRecurring() {
+  const ms = yearMonths();
+  const card = document.getElementById("recurring");
+  card.replaceChildren(el("h2", {}, L.dash_split));
+  const tiles = el("div", { class: "tiles" });
+  tiles.append(tile(L.dash_recurring, fmt(total("recurring"))), tile(L.dash_one_off, fmt(total("one_off"))));
+  if (total("loans")) tiles.append(tile(L.dash_loans, fmt(total("loans"))));
   card.append(tiles);
-  renderWidgetTiles();
-  const hasBenchmark = D.months.some(m => m.gap != null);
   const split = [
-    { name: L.dash_recurring, color: css("--s1"), values: D.months.map(m => m.recurring) },
-    { name: L.dash_one_off, color: css("--s2"), values: D.months.map(m => m.one_off) },
-    { name: L.dash_loans, color: css("--s3"), values: D.months.map(m => m.loans) },
+    { name: L.dash_recurring, color: css("--s1"), values: ms.map(m => value(m, "recurring")) },
+    { name: L.dash_one_off, color: css("--s2"), values: ms.map(m => value(m, "one_off")) },
+    { name: L.dash_loans, color: css("--s3"), values: ms.map(m => value(m, "loans")) },
   ];
   card.append(legend(split));
-  const chart = el("div", { class: "chart" });
-  card.append(chart);
-  columnChart(chart, months, { title: L.dash_widget, bars: split, stacked: true,
+  columnChart(chartIn(card), ms, { title: L.dash_split, bars: split, stacked: true, labelOf: monthLabel,
     rows: i => split.slice().reverse().map(x => ({ name: x.name, color: x.color, value: fmt(x.values[i]) })) });
-  if (hasBenchmark) {
-    card.append(el("h2", { style: "margin-top:16px" }, L.dash_gap_chart));
-    card.append(legend([{ name: L.dash_over, color: css("--over") }, { name: L.dash_under, color: css("--under") }]));
-    const gapChart = el("div", { class: "chart" });
-    card.append(gapChart);
-    const gap = { name: L.dash_gap, color: css("--over"), values: D.months.map(m => m.gap) };
-    columnChart(gapChart, months, { title: L.dash_gap_chart, bars: [gap],
-      colorOf: v => (v > 0 ? css("--over") : css("--under")),
-      rows: i => [{ name: L.dash_gap, color: gap.values[i] > 0 ? css("--over") : css("--under"), value: signed(gap.values[i]) },
-                  { name: L.dash_recurring, color: css("--s1"), value: fmt(D.months[i].recurring) },
-                  { name: L.dash_benchmark, color: css("--muted"), value: fmt(D.months[i].benchmark) }] });
-  } else {
-    card.append(el("p", { class: "note" }, L.dash_no_benchmark));
-  }
-  card.append(tableView(
-    [L.dash_month, L.dash_recurring, L.dash_one_off, L.dash_loans, ...(hasBenchmark ? [L.dash_benchmark, L.dash_gap] : [])],
-    D.months.map(m => [monthName(m.month), fmt(m.recurring), fmt(m.one_off), fmt(m.loans),
-      ...(hasBenchmark ? [fmt(m.benchmark), signed(m.gap)] : [])])));
+  card.append(tableView([L.dash_month, L.dash_recurring, L.dash_one_off, L.dash_loans],
+    [...presentMonths().map(m => [monthName(m), fmt(value(m, "recurring")), fmt(value(m, "one_off")), fmt(value(m, "loans"))]),
+     [L.dash_total, fmt(total("recurring")), fmt(total("one_off")), fmt(total("loans"))]]));
 }
 
-function renderAll() { renderCashflow(); renderCategories(); renderWidget(); renderKpis(); }
-select.addEventListener("change", renderKpis);
+function renderGap() {
+  const ms = yearMonths();
+  const card = document.getElementById("gap");
+  card.replaceChildren(el("h2", {}, L.dash_widget));
+  const compared = presentMonths().filter(m => byMonth[m].gap != null);
+  if (!compared.length) {
+    card.append(el("p", { class: "note" }, L.dash_no_benchmark));
+    return;
+  }
+  const sum = key => compared.reduce((acc, m) => acc + byMonth[m][key], 0);
+  const gapTotal = sum("gap"), over = gapTotal > 0;
+  const delta = el("div", { class: "delta" });
+  delta.append(statusBadge(over, `${pct.format(gapTotal / sum("benchmark"))} ${over ? L.dash_over : L.dash_under}`));
+  const tiles = el("div", { class: "tiles" });
+  tiles.append(tile(L.dash_benchmark, fmt(sum("benchmark"))), tile(L.dash_gap, signed(gapTotal), delta),
+    tile(L.dash_gap_month, signed(gapTotal / compared.length)));
+  card.append(tiles);
+  card.append(legend([{ name: L.dash_over, color: css("--over") }, { name: L.dash_under, color: css("--under") }]));
+  const gap = ms.map(m => value(m, "gap"));
+  columnChart(chartIn(card), ms, { title: L.dash_gap_chart, bars: [{ name: L.dash_gap, color: css("--over"), values: gap }],
+    labelOf: monthLabel, colorOf: v => (v > 0 ? css("--over") : css("--under")),
+    rows: i => (gap[i] == null ? [] : [
+      { name: L.dash_gap, color: gap[i] > 0 ? css("--over") : css("--under"), value: signed(gap[i]) },
+      { name: L.dash_recurring, color: css("--s1"), value: fmt(value(ms[i], "recurring")) },
+      { name: L.dash_benchmark, color: css("--muted"), value: fmt(value(ms[i], "benchmark")) }]) });
+  card.append(tableView([L.dash_month, L.dash_recurring, L.dash_benchmark, L.dash_gap],
+    [...compared.map(m => [monthName(m), fmt(value(m, "recurring")), fmt(value(m, "benchmark")), signed(value(m, "gap"))]),
+     [L.dash_total, fmt(sum("recurring")), fmt(sum("benchmark")), signed(gapTotal)]]));
+}
+
+function renderAll() { renderKpis(); renderCashflow(); renderCategories(); renderRecurring(); renderGap(); }
+select.addEventListener("change", renderAll);
 let resizeTimer;
 addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(renderAll, 150); });
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", renderAll);

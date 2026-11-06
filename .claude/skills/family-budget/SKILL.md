@@ -134,10 +134,11 @@ category, subcategory and total.
 uv run <skill>/scripts/dashboard.py
 ```
 
-Regenerates `data/dashboard.html` with every month in the ledger: month selector with income, expenses and balance;
-income/expenses/balance chart; expenses by category (the 7 categories with the highest recurring spending get a
-colour, the rest is folded into "Other", the table lists all); recurring spending vs one-offs vs loans and the gap
-of recurring spending vs ISTAT. The page is self-contained (no external resources) and stays in `data/`: never
+Regenerates `data/dashboard.html` with every month in the ledger. A year selector scopes the whole page: yearly
+totals (income, expenses, balance, months with data) and four half-width widgets on the 12 months of the year
+(months without data stay empty): income/expenses/balance; expenses by category (the 7 categories with the highest
+recurring spending get a colour, the rest is folded into "Other", the table lists all); recurring vs one-off vs
+loans; recurring spending vs the ISTAT average (yearly gap, monthly average gap, gap per month). The page is self-contained (no external resources) and stays in `data/`: never
 publish it as an artifact or anywhere else.
 
 After the reports, summarise the key points for the user (balance, expense split, categories over the average, open
