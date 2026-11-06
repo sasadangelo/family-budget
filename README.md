@@ -10,6 +10,8 @@ A [Claude Code](https://claude.com/claude-code) skill to track household income 
 - Tracks anomalies to verify and one-off (extraordinary) expenses.
 - Compares recurring spending with the ISTAT averages for Italian households (optional).
 - Generates three Markdown reports per month (main, statistics, details) in English or Italian.
+- Builds a private, self-contained HTML dashboard with every month: cash flow, categories, recurring vs one-off
+  spending and the gap vs the ISTAT average.
 
 ## Privacy
 

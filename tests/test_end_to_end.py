@@ -129,6 +129,13 @@ def test_month_produces_the_three_reports(tmp_path: Path, language: str) -> None
 
     run(data, "monthly_report.py", "--month", "2026-11")
     month = data / "2026-11"
+    run(data, "dashboard.py")
+    page = (data / "dashboard.html").read_text(encoding="utf-8")
+    payload = json.loads(re.search(r'id="data">(.*?)</script>', page, re.S).group(1))
+    november = payload["months"][0]
+    assert november["month"] == "2026-11" and november["recurring"] == 635.5 and november["one_off"] == 900.0
+    assert november["loans"] == 700.0 and november["gap"] is not None
+    assert not re.search(r"<(script|link|img)[^>]+(src|href)=", page), "the dashboard must not load external resources"
     if language == "en":
         main_sections, stats_sections, details_sections = EN_SECTIONS
         assert headings(month / "income-expenses.md") == main_sections

@@ -27,6 +27,7 @@ Talk to the user in their language. Reports are written in the language set in `
 | `data/YYYY-MM/income-expenses.md` | main monthly report |
 | `data/YYYY-MM/income-expenses-stats.md` | rankings: merchants and biggest expenses |
 | `data/YYYY-MM/income-expenses-details.md` | every transaction, category by category |
+| `data/dashboard.html` | private dashboard with every month (open it in a browser) |
 
 The data folder can be moved with the environment variable `FAMILY_BUDGET_DATA`.
 References: [references/conventions.md](references/conventions.md) (canonical format, input levels, merchants,
@@ -126,6 +127,18 @@ Writes three files in `data/YYYY-MM/`, always with the same sections in the same
 
 `income-expenses-details.md`: every transaction of each expense and income category, with bank description, bank
 category, subcategory and total.
+
+### 6. Dashboard
+
+```bash
+uv run <skill>/scripts/dashboard.py
+```
+
+Regenerates `data/dashboard.html` with every month in the ledger: month selector with income, expenses and balance;
+income/expenses/balance chart; expenses by category (the 7 categories with the highest recurring spending get a
+colour, the rest is folded into "Other", the table lists all); recurring spending vs one-offs vs loans and the gap
+of recurring spending vs ISTAT. The page is self-contained (no external resources) and stays in `data/`: never
+publish it as an artifact or anywhere else.
 
 After the reports, summarise the key points for the user (balance, expense split, categories over the average, open
 anomalies) without repeating every table.
