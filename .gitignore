@@ -1,0 +1,15 @@
+# Personal financial data: never commit
+data/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# OS
+.DS_Store

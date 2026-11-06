@@ -1,0 +1,39 @@
+{
+  "source": "ISTAT, Spese per consumi delle famiglie - Anno 2025 (ottobre 2026)",
+  "url": "https://www.istat.it/comunicato-stampa/spese-per-consumi-delle-famiglie-anno-2025/",
+  "year": 2025,
+  "italy_total": 2782.36,
+  "households": {
+    "1 componente": 2070.43,
+    "2 componenti": 2895.94,
+    "3 componenti": 3306.02,
+    "4 componenti": 3582.58,
+    "5 e più componenti": 3578.53,
+    "Persona sola 18-34 anni": 2042.16,
+    "Persona sola 35-64 anni": 2223.39,
+    "Persona sola 65 anni e più": 1944.78,
+    "Coppia senza figli con p.r. 18-34 anni": 3534.69,
+    "Coppia senza figli con p.r. 35-64 anni": 3187.03,
+    "Coppia senza figli con p.r. 65 anni e più": 2816.25,
+    "Coppia con 1 figlio": 3431.15,
+    "Coppia con 2 figli": 3618.44,
+    "Coppia con 3 e più figli": 3633.07,
+    "Monogenitore": 2746.41
+  },
+  "divisions": {
+    "Prodotti alimentari e bevande analcoliche": 552.06,
+    "Bevande alcoliche e tabacchi": 42.27,
+    "Abbigliamento e calzature": 105.40,
+    "Abitazione, acqua, elettricità, gas e altri combustibili": 1000.80,
+    "Affitti figurativi": 611.44,
+    "Mobili, articoli e servizi per la casa": 114.39,
+    "Salute": 113.18,
+    "Trasporti": 294.06,
+    "Informazione e comunicazione": 70.82,
+    "Ricreazione, sport e cultura": 105.31,
+    "Istruzione": 16.99,
+    "Servizi di ristorazione e di alloggio": 163.67,
+    "Servizi assicurativi e finanziari": 71.52,
+    "Cura della persona, protezione sociale e altri beni e servizi": 131.89
+  }
+}

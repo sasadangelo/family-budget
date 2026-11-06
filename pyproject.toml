@@ -1,0 +1,30 @@
+[project]
+name = "family-budget"
+version = "0.1.0"
+description = "Claude Code skill to analyse personal income and expenses from any bank export"
+requires-python = ">=3.12"
+dependencies = [
+    "openpyxl>=3.1",
+    "pdfplumber>=0.11",
+]
+
+[dependency-groups]
+dev = [
+    "black>=24.0",
+    "flake8>=7.0",
+    "isort>=5.13",
+    "mypy>=1.10",
+    "pytest>=8.0",
+]
+
+[tool.black]
+line-length = 120
+
+[tool.isort]
+profile = "black"
+line_length = 120
+lines_between_sections = 0
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".claude/skills/family-budget/scripts"]
