@@ -28,6 +28,7 @@ Talk to the user in their language. Reports are written in the language set in `
 | `data/YYYY-MM/income-expenses-stats.md` | rankings: merchants and biggest expenses |
 | `data/YYYY-MM/income-expenses-details.md` | every transaction, category by category |
 | `data/dashboard.html` | private dashboard with every month (open it in a browser) |
+| `data/dashboard/YYYY-MM.html` | private dashboard of one month (opened by clicking the month) |
 
 The data folder can be moved with the environment variable `FAMILY_BUDGET_DATA`.
 References: [references/conventions.md](references/conventions.md) (canonical format, input levels, merchants,
@@ -134,12 +135,22 @@ category, subcategory and total.
 uv run <skill>/scripts/dashboard.py
 ```
 
-Regenerates `data/dashboard.html` with every month in the ledger. A year selector scopes the whole page: yearly
-totals (income, expenses, balance, months with data) and four half-width widgets on the 12 months of the year
-(months without data stay empty): income/expenses/balance; expenses by category (the 7 categories with the highest
-recurring spending get a colour, the rest is folded into "Other", the table lists all); recurring vs one-off vs
-loans; recurring spending vs the ISTAT average (yearly gap, monthly average gap, gap per month). The page is self-contained (no external resources) and stays in `data/`: never
-publish it as an artifact or anywhere else.
+Regenerates `data/dashboard.html` (year view) and one page per month in `data/dashboard/YYYY-MM.html`.
+
+Year view: a year selector scopes the page. On top the yearly totals (income, expenses, balance) and the latest
+month with data; then four half-width widgets on the 12 months of the year (months without data stay empty):
+income/expenses/balance; income and expenses by category, with an Expenses/Income switch (the 7 categories with the
+highest recurring spending, or income, get a colour, the rest is folded into "Other", the table lists all);
+recurring vs one-off vs loans (yearly totals on top); recurring spending vs the ISTAT average (latest month on top,
+gap month by month below). Clicking a month in any chart opens its month page.
+
+Month view: the month's income, expenses, balance and savings rate; income and expenses by category (level bar with
+the same colours as the year view, then one bar per category); recurring vs one-off vs loans with the list of the
+month's one-off expenses; recurring spending vs ISTAT group by group. Links go back to the year and to the
+previous/next month.
+
+The pages are self-contained (no external resources) and stay in `data/`: never publish them as an artifact or
+anywhere else.
 
 After the reports, summarise the key points for the user (balance, expense split, categories over the average, open
 anomalies) without repeating every table.

@@ -135,7 +135,21 @@ def test_month_produces_the_three_reports(tmp_path: Path, language: str) -> None
     november = payload["months"][0]
     assert november["month"] == "2026-11" and november["recurring"] == 635.5 and november["one_off"] == 900.0
     assert november["loans"] == 700.0 and november["gap"] is not None
+    assert payload["page"] == "year" and payload["month_dir"] == "dashboard"
+    assert november["income_by_category"] == {"Stipendi": 3000.0}, "income keeps the bank categories"
+    assert payload["income_categories"] == ["Stipendi"]
     assert not re.search(r"<(script|link|img)[^>]+(src|href)=", page), "the dashboard must not load external resources"
+    month_page = (data / "dashboard" / "2026-11.html").read_text(encoding="utf-8")
+    detail = json.loads(re.search(r'id="data">(.*?)</script>', month_page, re.S).group(1))
+    assert detail["page"] == "month" and detail["previous"] is None and detail["next"] is None
+    month_figures = detail["month"]
+    assert month_figures["month"] == "2026-11" and month_figures["income"] == 3000.0
+    assert month_figures["expenses_by_category"][0] == {"name": "Casa", "amount": 900.0}
+    assert month_figures["one_off_items"] == [
+        {"date": "2026-11-15", "description": "Mobilificio Esempio", "note": "Nuovo armadio", "amount": 900.0}
+    ]
+    assert {c["label"] for c in month_figures["comparisons"]} == {"Vestiti", "Spesa"}
+    assert not re.search(r"<(script|link|img)[^>]+(src|href)=", month_page), "no external resources in month pages"
     if language == "en":
         main_sections, stats_sections, details_sections = EN_SECTIONS
         assert headings(month / "income-expenses.md") == main_sections
